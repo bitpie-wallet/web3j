@@ -66,7 +66,8 @@ public class Keys {
             throws NoSuchProviderException, NoSuchAlgorithmException,
                     InvalidAlgorithmParameterException {
 
-        KeyPairGenerator keyPairGenerator = KeyPairGenerator.getInstance("ECDSA", BouncyCastleProvider.PROVIDER_NAME);
+        KeyPairGenerator keyPairGenerator =
+                KeyPairGenerator.getInstance("ECDSA", BouncyCastleProvider.PROVIDER_NAME);
         ECGenParameterSpec ecGenParameterSpec = new ECGenParameterSpec("secp256k1");
         if (random != null) {
             keyPairGenerator.initialize(ecGenParameterSpec, random);
