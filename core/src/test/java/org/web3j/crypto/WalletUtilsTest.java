@@ -82,8 +82,13 @@ public class WalletUtilsTest {
 
     @Test
     public void testGenerateNewWalletFile() throws Exception {
-        String fileName = WalletUtils.generateNewWalletFile(PASSWORD, tempDir);
-        testGeneratedNewWalletFile(fileName);
+        try {
+            String fileName = WalletUtils.generateNewWalletFile(PASSWORD, tempDir);
+            testGeneratedNewWalletFile(fileName);
+        } catch (Exception e) {
+            e.printStackTrace();
+            throw e;
+        }
     }
 
     @Test

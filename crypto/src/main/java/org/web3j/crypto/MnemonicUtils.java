@@ -23,9 +23,9 @@ import java.util.Collections;
 import java.util.List;
 import java.util.StringTokenizer;
 
-import org.bouncycastle.crypto.digests.SHA512Digest;
-import org.bouncycastle.crypto.generators.PKCS5S2ParametersGenerator;
-import org.bouncycastle.crypto.params.KeyParameter;
+import org.spongycastle.crypto.digests.SHA512Digest;
+import org.spongycastle.crypto.generators.PKCS5S2ParametersGenerator;
+import org.spongycastle.crypto.params.KeyParameter;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.web3j.crypto.Hash.sha256;

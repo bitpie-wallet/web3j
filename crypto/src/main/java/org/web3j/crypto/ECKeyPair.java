@@ -16,12 +16,12 @@ import java.math.BigInteger;
 import java.security.KeyPair;
 import java.util.Arrays;
 
-import org.bouncycastle.crypto.digests.SHA256Digest;
-import org.bouncycastle.crypto.params.ECPrivateKeyParameters;
-import org.bouncycastle.crypto.signers.ECDSASigner;
-import org.bouncycastle.crypto.signers.HMacDSAKCalculator;
-import org.bouncycastle.jcajce.provider.asymmetric.ec.BCECPrivateKey;
-import org.bouncycastle.jcajce.provider.asymmetric.ec.BCECPublicKey;
+import org.spongycastle.crypto.digests.SHA256Digest;
+import org.spongycastle.crypto.params.ECPrivateKeyParameters;
+import org.spongycastle.crypto.signers.ECDSASigner;
+import org.spongycastle.crypto.signers.HMacDSAKCalculator;
+import org.spongycastle.jcajce.provider.asymmetric.ec.BCECPrivateKey;
+import org.spongycastle.jcajce.provider.asymmetric.ec.BCECPublicKey;
 
 import org.web3j.utils.Numeric;
 

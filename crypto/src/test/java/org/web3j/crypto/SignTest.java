@@ -15,7 +15,7 @@ package org.web3j.crypto;
 import java.math.BigInteger;
 import java.security.SignatureException;
 
-import org.bouncycastle.math.ec.ECPoint;
+import org.spongycastle.math.ec.ECPoint;
 import org.junit.jupiter.api.Test;
 
 import org.web3j.utils.Numeric;
