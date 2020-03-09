@@ -10,5 +10,3 @@ dependencies {
 }
 
 configurations { testArtifacts.extendsFrom testRuntime }
-
-artifacts { testArtifacts testsJar }

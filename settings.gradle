@@ -1,8 +1,6 @@
 rootProject.name = 'web3j'
 
 include 'abi'
-include 'contracts'
-include 'core'
 include 'crypto'
 include 'rlp'
 include 'tuples'
