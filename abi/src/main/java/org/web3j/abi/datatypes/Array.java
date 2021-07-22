@@ -53,6 +53,16 @@ public abstract class Array<T extends Type> implements Type<List<T>> {
     }
 
     @Override
+    public int bytes32PaddedLength() {
+        int length = 0;
+        for (T t : value) {
+            int valueLength = t.bytes32PaddedLength();
+            length += valueLength;
+        }
+        return length;
+    }
+
+    @Override
     public List<T> getValue() {
         return value;
     }

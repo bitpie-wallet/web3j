@@ -21,7 +21,9 @@ import org.web3j.abi.datatypes.Bytes;
 import org.web3j.abi.datatypes.BytesType;
 import org.web3j.abi.datatypes.DynamicArray;
 import org.web3j.abi.datatypes.DynamicBytes;
+import org.web3j.abi.datatypes.DynamicStruct;
 import org.web3j.abi.datatypes.StaticArray;
+import org.web3j.abi.datatypes.StaticStruct;
 import org.web3j.abi.datatypes.Type;
 import org.web3j.abi.datatypes.Utf8String;
 import org.web3j.abi.datatypes.generated.Bytes32;
@@ -29,6 +31,9 @@ import org.web3j.utils.Numeric;
 import org.web3j.utils.Strings;
 
 import static org.web3j.abi.TypeDecoder.MAX_BYTE_LENGTH_FOR_HEX_STRING;
+import static org.web3j.abi.TypeDecoder.isDynamic;
+import static org.web3j.abi.Utils.getParameterizedTypeFromArray;
+import static org.web3j.abi.Utils.staticStructNestedPublicFieldsFlatList;
 
 /**
  * Ethereum Contract Application Binary Interface (ABI) encoding for functions. Further details are
@@ -78,13 +83,19 @@ public class DefaultFunctionReturnDecoder extends FunctionReturnDecoder {
         int offset = 0;
         for (TypeReference<?> typeReference : outputParameters) {
             try {
-                @SuppressWarnings("unchecked")
-                Class<Type> type = (Class<Type>) typeReference.getClassType();
+                int hexStringDataOffset = getDataOffset(input, offset, typeReference);
 
-                int hexStringDataOffset = getDataOffset(input, offset, type);
+                @SuppressWarnings("unchecked")
+                Class<Type> classType = (Class<Type>) typeReference.getClassType();
 
                 Type result;
-                if (DynamicArray.class.isAssignableFrom(type)) {
+                if (DynamicStruct.class.isAssignableFrom(classType)) {
+                    result =
+                            TypeDecoder.decodeDynamicStruct(
+                                    input, hexStringDataOffset, typeReference);
+                    offset += MAX_BYTE_LENGTH_FOR_HEX_STRING;
+
+                } else if (DynamicArray.class.isAssignableFrom(classType)) {
                     result =
                             TypeDecoder.decodeDynamicArray(
                                     input, hexStringDataOffset, typeReference);
@@ -97,18 +108,39 @@ public class DefaultFunctionReturnDecoder extends FunctionReturnDecoder {
                                     input, hexStringDataOffset, typeReference, length);
                     offset += length * MAX_BYTE_LENGTH_FOR_HEX_STRING;
 
-                } else if (StaticArray.class.isAssignableFrom(type)) {
+                } else if (StaticStruct.class.isAssignableFrom(classType)) {
+                    result =
+                            TypeDecoder.decodeStaticStruct(
+                                    input, hexStringDataOffset, typeReference);
+                    offset +=
+                            staticStructNestedPublicFieldsFlatList(classType).size()
+                                    * MAX_BYTE_LENGTH_FOR_HEX_STRING;
+                } else if (StaticArray.class.isAssignableFrom(classType)) {
                     int length =
                             Integer.parseInt(
-                                    type.getSimpleName()
+                                    classType
+                                            .getSimpleName()
                                             .substring(StaticArray.class.getSimpleName().length()));
                     result =
                             TypeDecoder.decodeStaticArray(
                                     input, hexStringDataOffset, typeReference, length);
-                    offset += length * MAX_BYTE_LENGTH_FOR_HEX_STRING;
-
+                    if (DynamicStruct.class.isAssignableFrom(
+                            getParameterizedTypeFromArray(typeReference))) {
+                        offset += MAX_BYTE_LENGTH_FOR_HEX_STRING;
+                    } else if (StaticStruct.class.isAssignableFrom(
+                            getParameterizedTypeFromArray(typeReference))) {
+                        offset +=
+                                staticStructNestedPublicFieldsFlatList(
+                                                        getParameterizedTypeFromArray(
+                                                                typeReference))
+                                                .size()
+                                        * length
+                                        * MAX_BYTE_LENGTH_FOR_HEX_STRING;
+                    } else {
+                        offset += length * MAX_BYTE_LENGTH_FOR_HEX_STRING;
+                    }
                 } else {
-                    result = TypeDecoder.decode(input, hexStringDataOffset, type);
+                    result = TypeDecoder.decode(input, hexStringDataOffset, classType);
                     offset += MAX_BYTE_LENGTH_FOR_HEX_STRING;
                 }
                 results.add(result);
@@ -120,13 +152,39 @@ public class DefaultFunctionReturnDecoder extends FunctionReturnDecoder {
         return results;
     }
 
-    private static <T extends Type> int getDataOffset(String input, int offset, Class<T> type) {
+    public static <T extends Type> int getDataOffset(
+            String input, int offset, TypeReference<?> typeReference)
+            throws ClassNotFoundException {
+        @SuppressWarnings("unchecked")
+        Class<Type> type = (Class<Type>) typeReference.getClassType();
         if (DynamicBytes.class.isAssignableFrom(type)
                 || Utf8String.class.isAssignableFrom(type)
-                || DynamicArray.class.isAssignableFrom(type)) {
+                || DynamicArray.class.isAssignableFrom(type)
+                || hasDynamicOffsetInStaticArray(typeReference, offset)) {
             return TypeDecoder.decodeUintAsInt(input, offset) << 1;
         } else {
             return offset;
+        }
+    }
+
+    /**
+     * Checks if the parametrized type is offsetted in case of static array containing structs.
+     *
+     * @param typeReference of static array
+     * @return true, if static array elements have dynamic offsets
+     * @throws ClassNotFoundException if class type cannot be determined
+     */
+    private static boolean hasDynamicOffsetInStaticArray(TypeReference<?> typeReference, int offset)
+            throws ClassNotFoundException {
+        @SuppressWarnings("unchecked")
+        Class<Type> type = (Class<Type>) typeReference.getClassType();
+        try {
+            return StaticArray.class.isAssignableFrom(type)
+                    && (DynamicStruct.class.isAssignableFrom(
+                                    getParameterizedTypeFromArray(typeReference))
+                            || isDynamic(getParameterizedTypeFromArray(typeReference)));
+        } catch (ClassCastException e) {
+            return false;
         }
     }
 }

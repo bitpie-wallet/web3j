@@ -126,6 +126,34 @@ public class RawTransactionManager extends TransactionManager {
     }
 
     @Override
+    public EthSendTransaction sendEIP1559Transaction(
+            long chainId,
+            BigInteger maxPriorityFeePerGas,
+            BigInteger maxFeePerGas,
+            BigInteger gasLimit,
+            String to,
+            String data,
+            BigInteger value,
+            boolean constructor)
+            throws IOException {
+
+        BigInteger nonce = getNonce();
+
+        RawTransaction rawTransaction =
+                RawTransaction.createTransaction(
+                        chainId,
+                        nonce,
+                        gasLimit,
+                        to,
+                        value,
+                        data,
+                        maxPriorityFeePerGas,
+                        maxFeePerGas);
+
+        return signAndSend(rawTransaction);
+    }
+
+    @Override
     public String sendCall(String to, String data, DefaultBlockParameter defaultBlockParameter)
             throws IOException {
         EthCall ethCall =
