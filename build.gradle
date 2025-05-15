@@ -14,7 +14,7 @@ plugins {
 
 ext {
     bouncycastleVersion = '1.80'
-    jacksonVersion = '2.17.1'
+    jacksonVersion = '2.13.0'
     javaPoetVersion = '1.13.0'
     kotlinVersion = '1.9.24'
     kotlinPoetVersion = '1.16.0'

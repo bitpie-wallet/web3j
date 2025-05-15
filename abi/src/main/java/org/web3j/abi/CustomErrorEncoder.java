@@ -13,7 +13,6 @@
 package org.web3j.abi;
 
 import java.util.List;
-import java.util.stream.Collectors;
 
 import org.web3j.abi.datatypes.CustomError;
 import org.web3j.abi.datatypes.Type;
@@ -38,9 +37,15 @@ public class CustomErrorEncoder {
         StringBuilder result = new StringBuilder();
         result.append(errorName);
         result.append("(");
-        String params =
-                parameters.stream().map(Utils::getTypeName).collect(Collectors.joining(","));
-        result.append(params);
+
+        // Manually join with commas instead of streams + Collectors.joining
+        for (int i = 0; i < parameters.size(); i++) {
+            result.append(Utils.getTypeName(parameters.get(i)));
+            if (i < parameters.size() - 1) {
+                result.append(",");
+            }
+        }
+
         result.append(")");
         return result.toString();
     }

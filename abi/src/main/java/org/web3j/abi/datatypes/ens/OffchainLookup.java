@@ -15,7 +15,6 @@ package org.web3j.abi.datatypes.ens;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
-import java.util.stream.Collectors;
 
 import org.web3j.abi.FunctionReturnDecoder;
 import org.web3j.abi.TypeReference;
@@ -55,6 +54,14 @@ public class OffchainLookup extends DynamicStruct {
                         new TypeReference<DynamicBytes>() {}));
     }
 
+    private static List<Utf8String> toUtf8StringList(List<String> urls) {
+        List<Utf8String> list = new ArrayList<Utf8String>(urls.size());
+        for (String u : urls) {
+            list.add(new Utf8String(u));
+        }
+        return list;
+    }
+
     public OffchainLookup(
             String sender,
             List<String> urls,
@@ -63,9 +70,7 @@ public class OffchainLookup extends DynamicStruct {
             byte[] extraData) {
         super(
                 new Address(sender),
-                new DynamicArray<>(
-                        Utf8String.class,
-                        urls.stream().map(Utf8String::new).collect(Collectors.toList())),
+                new DynamicArray<>(Utf8String.class, toUtf8StringList(urls)),
                 new DynamicBytes(callbackFunction),
                 new Bytes4(callData),
                 new DynamicBytes(extraData));
@@ -76,6 +81,14 @@ public class OffchainLookup extends DynamicStruct {
         this.extraData = extraData;
     }
 
+    private static List<String> toStringList(List<Utf8String> utf8List) {
+        List<String> list = new ArrayList<String>(utf8List.size());
+        for (Utf8String s : utf8List) {
+            list.add(s.getValue());
+        }
+        return list;
+    }
+
     public OffchainLookup(
             Address sender,
             DynamicArray<Utf8String> urls,
@@ -84,7 +97,7 @@ public class OffchainLookup extends DynamicStruct {
             DynamicBytes extraData) {
         super(sender, urls, callData, callbackFunction, extraData);
         this.sender = sender.getValue();
-        this.urls = urls.getValue().stream().map(Utf8String::getValue).collect(Collectors.toList());
+        this.urls = toStringList(urls.getValue());
         this.callData = callData.getValue();
         this.callbackFunction = callbackFunction.getValue();
         this.extraData = extraData.getValue();

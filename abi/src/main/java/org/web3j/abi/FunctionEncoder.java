@@ -17,7 +17,6 @@ import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
 import java.util.ServiceLoader;
-import java.util.stream.Collectors;
 
 import org.web3j.abi.datatypes.Function;
 import org.web3j.abi.datatypes.Type;
@@ -102,12 +101,15 @@ public abstract class FunctionEncoder {
     protected static String buildMethodSignature(
             final String methodName, final List<Type> parameters) {
 
-        final StringBuilder result = new StringBuilder();
+        StringBuilder result = new StringBuilder();
         result.append(methodName);
         result.append("(");
-        final String params =
-                parameters.stream().map(Type::getTypeAsString).collect(Collectors.joining(","));
-        result.append(params);
+        for (int i = 0; i < parameters.size(); i++) {
+            result.append(parameters.get(i).getTypeAsString());
+            if (i < parameters.size() - 1) {
+                result.append(",");
+            }
+        }
         result.append(")");
         return result.toString();
     }

@@ -24,11 +24,9 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.StringJoiner;
 import java.util.TreeSet;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-import java.util.stream.Collectors;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -119,14 +117,20 @@ public class StructuredDataEncoder {
     }
 
     public String encodeStruct(String structName) {
-        HashMap<String, List<StructuredData.Entry>> types = jsonMessageObject.getTypes();
-
-        StringJoiner structRepresentation = new StringJoiner(",", structName + "(", ")");
-        for (StructuredData.Entry entry : types.get(structName)) {
-            structRepresentation.add(String.format("%s %s", entry.getType(), entry.getName()));
+        List<StructuredData.Entry> fields = jsonMessageObject.getTypes().get(structName);
+        StringBuilder sb = new StringBuilder();
+        sb.append(structName).append("(");
+        for (int i = 0; i < fields.size(); i++) {
+            StructuredData.Entry entry = fields.get(i);
+            sb.append(entry.getType())
+                    .append(" ")
+                    .append(entry.getName());
+            if (i < fields.size() - 1) {
+                sb.append(",");
+            }
         }
-
-        return structRepresentation.toString();
+        sb.append(")");
+        return sb.toString();
     }
 
     public String encodeType(String primaryType) {
@@ -187,31 +191,37 @@ public class StructuredDataEncoder {
     }
 
     public List<Integer> getArrayDimensionsFromData(Object data) throws RuntimeException {
+        // First, get all (depth, size) pairs
         List<Pair> depthsAndDimensions = getDepthsAndDimensions(data, 0);
-        // groupedByDepth has key as depth and value as List(pair(Depth, Dimension))
-        Map<Object, List<Pair>> groupedByDepth =
-                depthsAndDimensions.stream().collect(Collectors.groupingBy(Pair::getFirst));
 
-        // depthDimensionsMap is aimed to have key as depth and value as List(Dimension)
-        Map<Integer, List<Integer>> depthDimensionsMap = new HashMap<>();
-        for (Map.Entry<Object, List<Pair>> entry : groupedByDepth.entrySet()) {
-            List<Integer> pureDimensions = new ArrayList<>();
-            for (Pair depthDimensionPair : entry.getValue()) {
-                pureDimensions.add((Integer) depthDimensionPair.getSecond());
+        // Group the pairs by their depth
+        Map<Integer, List<Pair>> groupedByDepth = new HashMap<Integer, List<Pair>>();
+        for (Pair p : depthsAndDimensions) {
+            Integer depth = (Integer) p.getFirst();
+            List<Pair> bucket = groupedByDepth.get(depth);
+            if (bucket == null) {
+                bucket = new ArrayList<>();
+                groupedByDepth.put(depth, bucket);
             }
-            depthDimensionsMap.put((Integer) entry.getKey(), pureDimensions);
+            bucket.add(p);
         }
 
-        List<Integer> dimensions = new ArrayList<>();
-        for (Map.Entry<Integer, List<Integer>> entry : depthDimensionsMap.entrySet()) {
-            Set<Integer> setOfDimensionsInParticularDepth = new TreeSet<>(entry.getValue());
-            if (setOfDimensionsInParticularDepth.size() != 1) {
+        // For each depth, collect the unique sizes and ensure there's exactly one
+        List<Integer> dimensions = new ArrayList<Integer>();
+        for (Map.Entry<Integer, List<Pair>> entry : groupedByDepth.entrySet()) {
+            Set<Integer> uniqueSizes = new TreeSet<Integer>();
+            for (Pair dp : entry.getValue()) {
+                uniqueSizes.add((Integer) dp.getSecond());
+            }
+
+            if (uniqueSizes.size() != 1) {
                 throw new RuntimeException(
                         String.format(
-                                "Depth %d of array data has more than one dimensions",
-                                entry.getKey()));
+                                "Depth %d of array data has more than one dimension: %s",
+                                entry.getKey(), uniqueSizes));
             }
-            dimensions.add(setOfDimensionsInParticularDepth.stream().findFirst().get());
+            // grab the single element
+            dimensions.add(uniqueSizes.iterator().next());
         }
 
         return dimensions;

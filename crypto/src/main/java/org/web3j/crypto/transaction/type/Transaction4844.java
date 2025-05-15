@@ -4,7 +4,7 @@
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with
  * the License. You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ *     http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software distributed under the License is distributed on
  * an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the
@@ -17,8 +17,6 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
-import java.util.stream.Collectors;
-import java.util.stream.IntStream;
 
 import org.apache.tuweni.bytes.Bytes;
 
@@ -94,32 +92,33 @@ public class Transaction4844 extends Transaction1559 implements ITransaction {
         this.maxFeePerBlobGas = maxFeePerBlobGas;
         this.blobs = Optional.ofNullable(blobsData);
 
-        assert blobsData != null;
-        this.kzgCommitments =
-                Optional.of(
-                        blobsData.stream()
-                                .map(BlobUtils::getCommitment)
-                                .collect(Collectors.toList()));
+        // Build commitments list
+        List<Bytes> commitments = new ArrayList<Bytes>();
+        if (blobsData != null) {
+            for (Blob b : blobsData) {
+                commitments.add(BlobUtils.getCommitment(b));
+            }
+        }
+        this.kzgCommitments = Optional.of(commitments);
 
-        this.kzgProofs =
-                Optional.of(
-                        IntStream.range(0, blobsData.size())
-                                .mapToObj(
-                                        i ->
-                                                BlobUtils.getProof(
-                                                        blobsData.get(i),
-                                                        this.kzgCommitments.get().get(i)))
-                                .collect(Collectors.toList()));
+        // Build proofs list
+        List<Bytes> proofs = new ArrayList<Bytes>();
+        for (int i = 0; i < commitments.size(); i++) {
+            proofs.add(BlobUtils.getProof(blobsData.get(i), commitments.get(i)));
+        }
+        this.kzgProofs = Optional.of(proofs);
 
-        this.versionedHashes =
-                this.kzgCommitments.get().stream()
-                        .map(BlobUtils::kzgToVersionedHash)
-                        .collect(Collectors.toList());
+        // Build versioned hashes list
+        List<Bytes> hashes = new ArrayList<Bytes>();
+        for (Bytes c : commitments) {
+            hashes.add(BlobUtils.kzgToVersionedHash(c));
+        }
+        this.versionedHashes = hashes;
     }
 
     @Override
     public List<RlpType> asRlpValues(Sign.SignatureData signatureData) {
-        List<RlpType> resultTx = new ArrayList<>();
+        List<RlpType> resultTx = new ArrayList<RlpType>();
 
         resultTx.add(RlpString.create(getChainId()));
         resultTx.add(RlpString.create(getNonce()));
@@ -135,8 +134,8 @@ public class Transaction4844 extends Transaction1559 implements ITransaction {
         }
 
         resultTx.add(RlpString.create(getValue()));
-        byte[] data = Numeric.hexStringToByteArray(getData());
-        resultTx.add(RlpString.create(data));
+        byte[] dataBytes = Numeric.hexStringToByteArray(getData());
+        resultTx.add(RlpString.create(dataBytes));
 
         // access list
         resultTx.add(new RlpList());
@@ -147,23 +146,19 @@ public class Transaction4844 extends Transaction1559 implements ITransaction {
 
         if (signatureData != null) {
             resultTx.add(RlpString.create(Sign.getRecId(signatureData, getChainId())));
-            resultTx.add(
-                    RlpString.create(
-                            org.web3j.utils.Bytes.trimLeadingZeroes(signatureData.getR())));
-            resultTx.add(
-                    RlpString.create(
-                            org.web3j.utils.Bytes.trimLeadingZeroes(signatureData.getS())));
+            resultTx.add(RlpString.create(org.web3j.utils.Bytes.trimLeadingZeroes(signatureData.getR())));
+            resultTx.add(RlpString.create(org.web3j.utils.Bytes.trimLeadingZeroes(signatureData.getS())));
         }
 
-        List<RlpType> result = new ArrayList<>();
-        result.add(new RlpList(resultTx));
+        List<RlpType> wrapped = new ArrayList<RlpType>();
+        wrapped.add(new RlpList(resultTx));
 
         // Adding blobs, commitments, and proofs
-        result.add(new RlpList(getRlpBlobs()));
-        result.add(new RlpList(getRlpKzgCommitments()));
-        result.add(new RlpList(getRlpKzgProofs()));
+        wrapped.add(new RlpList(getRlpBlobs()));
+        wrapped.add(new RlpList(getRlpKzgCommitments()));
+        wrapped.add(new RlpList(getRlpKzgProofs()));
 
-        return result;
+        return wrapped;
     }
 
     public static Transaction4844 createTransaction(
@@ -268,38 +263,44 @@ public class Transaction4844 extends Transaction1559 implements ITransaction {
     }
 
     public List<RlpType> getRlpVersionedHashes() {
-        return versionedHashes.stream()
-                .map(hash -> RlpString.create(hash.toArray()))
-                .collect(Collectors.toList());
+        List<RlpType> list = new ArrayList<RlpType>();
+        for (Bytes hash : versionedHashes) {
+            list.add(RlpString.create(hash.toArray()));
+        }
+        return list;
     }
 
     public List<RlpType> getRlpKzgCommitments() {
-        return kzgCommitments
-                .<List<RlpType>>map(
-                        bytesList ->
-                                bytesList.stream()
-                                        .map(bytes -> RlpString.create(bytes.toArray()))
-                                        .collect(Collectors.toList()))
-                .orElse(Collections.emptyList());
+        if (kzgCommitments.isPresent()) {
+            List<RlpType> list = new ArrayList<RlpType>();
+            for (Bytes b : kzgCommitments.get()) {
+                list.add(RlpString.create(b.toArray()));
+            }
+            return list;
+        }
+        return Collections.emptyList();
     }
 
     public List<RlpType> getRlpKzgProofs() {
-        return kzgProofs
-                .<List<RlpType>>map(
-                        bytesList ->
-                                bytesList.stream()
-                                        .map(bytes -> RlpString.create(bytes.toArray()))
-                                        .collect(Collectors.toList()))
-                .orElse(Collections.emptyList());
+        if (kzgProofs.isPresent()) {
+            List<RlpType> list = new ArrayList<RlpType>();
+            for (Bytes b : kzgProofs.get()) {
+                list.add(RlpString.create(b.toArray()));
+            }
+            return list;
+        }
+        return Collections.emptyList();
     }
 
     public List<RlpType> getRlpBlobs() {
-        return blobs.<List<RlpType>>map(
-                        blobList ->
-                                blobList.stream()
-                                        .map(blob -> RlpString.create(blob.getData().toArray()))
-                                        .collect(Collectors.toList()))
-                .orElse(Collections.emptyList());
+        if (blobs.isPresent()) {
+            List<RlpType> list = new ArrayList<RlpType>();
+            for (Blob blob : blobs.get()) {
+                list.add(RlpString.create(blob.getData().toArray()));
+            }
+            return list;
+        }
+        return Collections.emptyList();
     }
 
     @Override

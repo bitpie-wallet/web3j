@@ -19,11 +19,7 @@ import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Modifier;
 import java.lang.reflect.ParameterizedType;
 import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collection;
 import java.util.List;
-import java.util.stream.Collectors;
-import java.util.stream.Stream;
 
 import org.web3j.abi.datatypes.DynamicArray;
 import org.web3j.abi.datatypes.DynamicBytes;
@@ -109,16 +105,22 @@ public class Utils {
     }
 
     public static Constructor findStructConstructor(Class classType) {
-        return Arrays.stream(classType.getDeclaredConstructors())
-                .filter(
-                        declaredConstructor ->
-                                Arrays.stream(declaredConstructor.getParameterTypes())
-                                        .allMatch(Type.class::isAssignableFrom))
-                .findAny()
-                .orElseThrow(
-                        () ->
-                                new RuntimeException(
-                                        "TypeReferenced struct must contain a constructor with types that extend Type"));
+        Constructor[] ctors = classType.getDeclaredConstructors();
+        for (Constructor ctor : ctors) {
+            Class<?>[] paramTypes = ctor.getParameterTypes();
+            boolean ok = true;
+            for (Class<?> pt : paramTypes) {
+                if (!Type.class.isAssignableFrom(pt)) {
+                    ok = false;
+                    break;
+                }
+            }
+            if (ok) {
+                return ctor;
+            }
+        }
+        throw new RuntimeException(
+                "TypeReferenced struct must contain a constructor with types that extend Type");
     }
 
     static String getSimpleTypeName(Class<?> type) {
@@ -211,11 +213,10 @@ public class Utils {
 
     @SuppressWarnings("unchecked")
     public static List<TypeReference<Type>> convert(List<TypeReference<?>> input) {
-        List<TypeReference<Type>> result = new ArrayList<>(input.size());
-        result.addAll(
-                input.stream()
-                        .map(typeReference -> (TypeReference<Type>) typeReference)
-                        .collect(Collectors.toList()));
+        List<TypeReference<Type>> result = new ArrayList<TypeReference<Type>>(input.size());
+        for (TypeReference<?> tr : input) {
+            result.add((TypeReference<Type>) tr);
+        }
         return result;
     }
 
@@ -268,9 +269,14 @@ public class Utils {
      * @return Flat list of canonical fields in a nested struct
      */
     public static List<Field> staticStructNestedPublicFieldsFlatList(Class<Type> classType) {
-        return staticStructsNestedFieldsFlatList(classType).stream()
-                .filter(field -> Modifier.isPublic(field.getModifiers()))
-                .collect(Collectors.toList());
+        List<Field> all = staticStructsNestedFieldsFlatList(classType);
+        List<Field> list = new ArrayList<Field>();
+        for (Field f : all) {
+            if (Modifier.isPublic(f.getModifiers())) {
+                list.add(f);
+            }
+        }
+        return list;
     }
 
     /**
@@ -282,21 +288,24 @@ public class Utils {
      */
     @SuppressWarnings("unchecked")
     public static List<Field> staticStructsNestedFieldsFlatList(Class<Type> classType) {
-        List<Field> canonicalFields =
-                Arrays.stream(classType.getDeclaredFields())
-                        .filter(field -> !StaticStruct.class.isAssignableFrom(field.getType()))
-                        .collect(Collectors.toList());
-        List<Field> nestedFields =
-                Arrays.stream(classType.getDeclaredFields())
-                        .filter(field -> StaticStruct.class.isAssignableFrom(field.getType()))
-                        .map(
-                                field ->
-                                        staticStructsNestedFieldsFlatList(
-                                                (Class<Type>) field.getType()))
-                        .flatMap(Collection::stream)
-                        .collect(Collectors.toList());
-        return Stream.concat(canonicalFields.stream(), nestedFields.stream())
-                .collect(Collectors.toList());
+        Field[] declared = classType.getDeclaredFields();
+        List<Field> canonicalFields = new ArrayList<Field>();
+        for (Field field : declared) {
+            if (!StaticStruct.class.isAssignableFrom(field.getType())) {
+                canonicalFields.add(field);
+            }
+        }
+        List<Field> nestedFields = new ArrayList<Field>();
+        for (Field field : declared) {
+            if (StaticStruct.class.isAssignableFrom(field.getType())) {
+                nestedFields.addAll(
+                        staticStructsNestedFieldsFlatList((Class<Type>) field.getType()));
+            }
+        }
+        List<Field> result = new ArrayList<Field>();
+        result.addAll(canonicalFields);
+        result.addAll(nestedFields);
+        return result;
     }
 
     /** Ports {@link java.lang.reflect.Type#getTypeName()}. */

@@ -4,7 +4,7 @@
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with
  * the License. You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ *     http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software distributed under the License is distributed on
  * an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the
@@ -13,7 +13,6 @@
 package org.web3j.abi;
 
 import java.util.List;
-import java.util.stream.Collectors;
 
 import org.web3j.abi.datatypes.Event;
 import org.web3j.abi.datatypes.Type;
@@ -29,9 +28,7 @@ public class EventEncoder {
     private EventEncoder() {}
 
     public static String encode(Event event) {
-
         String methodSignature = buildMethodSignature(event.getName(), event.getParameters());
-
         return buildEventSignature(methodSignature);
     }
 
@@ -41,9 +38,12 @@ public class EventEncoder {
         StringBuilder result = new StringBuilder();
         result.append(methodName);
         result.append("(");
-        String params =
-                parameters.stream().map(Utils::getTypeName).collect(Collectors.joining(","));
-        result.append(params);
+        for (int i = 0; i < parameters.size(); i++) {
+            result.append(Utils.getTypeName(parameters.get(i)));
+            if (i < parameters.size() - 1) {
+                result.append(",");
+            }
+        }
         result.append(")");
         return result.toString();
     }

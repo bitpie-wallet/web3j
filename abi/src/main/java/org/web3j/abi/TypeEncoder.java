@@ -16,7 +16,6 @@ import java.math.BigInteger;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.stream.Collectors;
 
 import org.web3j.abi.datatypes.Address;
 import org.web3j.abi.datatypes.Array;
@@ -302,7 +301,11 @@ public class TypeEncoder {
         final List<String> data = new ArrayList<>();
         data.addAll(offsetsAndStaticValues);
         data.addAll(dynamicValues);
-        return String.join("", data);
+        StringBuilder sb = new StringBuilder();
+        for (String part : data) {
+            sb.append(part);
+        }
+        return sb.toString();
     }
 
     static <T extends Type> String encodeDynamicArray(DynamicArray<T> value) {
@@ -378,8 +381,10 @@ public class TypeEncoder {
     private static <T extends Type> String encodeDynamicsTypesArraysOffsets(Array<T> value) {
         StringBuilder result = new StringBuilder();
         long offset = value.getValue().size();
-        List<String> tailsEncoding =
-                value.getValue().stream().map(TypeEncoder::encode).collect(Collectors.toList());
+        List<String> tailsEncoding = new ArrayList<>();
+        for (Type elem : value.getValue()) {
+            tailsEncoding.add(encode(elem));
+        }
         for (int i = 0; i < value.getValue().size(); i++) {
             if (i == 0) {
                 offset = offset * MAX_BYTE_LENGTH;

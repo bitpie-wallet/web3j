@@ -352,35 +352,37 @@ public class TypeDecoder {
     public static <T extends Type> T decodeStaticArray(
             String input, int offset, TypeReference<T> typeReference, int length) {
 
-        BiFunction<List<T>, String, T> function =
-                (elements, typeName) -> {
-                    if (elements.isEmpty()) {
-                        throw new UnsupportedOperationException(
-                                "Zero length fixed array is invalid type");
-                    } else {
-                        return instantiateStaticArray(elements, length);
-                    }
-                };
+        BiFunction<List<T>, String, T> function = new BiFunction<List<T>, String, T>() {
+            @Override
+            public T apply(List<T> elements, String typeName) {
+                if (elements.isEmpty()) {
+                    throw new UnsupportedOperationException(
+                            "Zero length fixed array is invalid type");
+                }
+                return instantiateStaticArray(elements, length);
+            }
+        };
 
         return decodeArrayElements(input, offset, typeReference, length, function);
     }
 
     public static <T extends Type> T decodeStaticStruct(
             final String input, final int offset, final TypeReference<T> typeReference) {
-        BiFunction<List<T>, String, T> function =
-                (elements, typeName) -> {
-                    if (elements.isEmpty()) {
-                        throw new UnsupportedOperationException(
-                                "Zero length fixed array is invalid type");
-                    } else {
-                        return instantiateStruct(typeReference, elements);
-                    }
-                };
+
+        BiFunction<List<T>, String, T> function = new BiFunction<List<T>, String, T>() {
+            @Override
+            public T apply(List<T> elements, String typeName) {
+                if (elements.isEmpty()) {
+                    throw new UnsupportedOperationException(
+                            "Zero length fixed array is invalid type");
+                }
+                return instantiateStruct(typeReference, elements);
+            }
+        };
 
         if (typeReference.getInnerTypes() != null) {
             return decodeStaticStructElementFromInnerTypes(input, offset, typeReference, function);
         }
-
         return decodeStaticStructElement(input, offset, typeReference, function);
     }
 
@@ -388,16 +390,19 @@ public class TypeDecoder {
     private static <T extends Type> int countNestedFields(final TypeReference<T> typeReference) {
         try {
             if (StaticStruct.class.isAssignableFrom(typeReference.getClassType())) {
-                return typeReference.getInnerTypes().stream()
-                        .map((tr) -> countNestedFields(tr))
-                        .reduce(0, (a, b) -> a + b);
+                List<TypeReference<?>> inner = typeReference.getInnerTypes();
+                int sum = 0;
+                for (TypeReference<?> tr : inner) {
+                    @SuppressWarnings("unchecked")
+                    TypeReference<T> ttr = (TypeReference<T>) tr;
+                    sum += countNestedFields(ttr);
+                }
+                return sum;
             }
-
             return 1;
         } catch (ClassNotFoundException e) {
             throw new UnsupportedOperationException(
-                    "countNestedFields failed for " + Utils.getTypeName(typeReference.getType()),
-                    e);
+                    "countNestedFields failed for " + Utils.getTypeName(typeReference.getType()), e);
         }
     }
 
@@ -515,11 +520,14 @@ public class TypeDecoder {
 
         int length = decodeUintAsInt(input, offset);
 
-        BiFunction<List<T>, String, T> function =
-                (elements, typeName) -> (T) new DynamicArray(AbiTypes.getType(typeName), elements);
+        BiFunction<List<T>, String, T> function = new BiFunction<List<T>, String, T>() {
+            @Override
+            public T apply(List<T> elements, String typeName) {
+                return (T) new DynamicArray(AbiTypes.getType(typeName), elements);
+            }
+        };
 
         int valueOffset = offset + MAX_BYTE_LENGTH_FOR_HEX_STRING;
-
         return decodeArrayElements(input, valueOffset, typeReference, length, function);
     }
 
@@ -527,22 +535,21 @@ public class TypeDecoder {
             String input, int offset, TypeReference<T> typeReference)
             throws ClassNotFoundException {
 
-        BiFunction<List<T>, String, T> function =
-                (elements, typeName) -> {
-                    if (elements.isEmpty()) {
-                        throw new UnsupportedOperationException(
-                                "Zero length fixed array is invalid type");
-                    }
-
-                    return instantiateStruct(typeReference, elements);
-                };
+        BiFunction<List<T>, String, T> function = new BiFunction<List<T>, String, T>() {
+            @Override
+            public T apply(List<T> elements, String typeName) {
+                if (elements.isEmpty()) {
+                    throw new UnsupportedOperationException(
+                            "Zero length fixed array is invalid type");
+                }
+                return instantiateStruct(typeReference, elements);
+            }
+        };
 
         if (typeReference.getClassType().isAssignableFrom(DynamicStruct.class)
                 && typeReference.getInnerTypes() != null) {
-            return decodeDynamicStructElementsFromInnerTypes(
-                    input, offset, typeReference, function);
+            return decodeDynamicStructElementsFromInnerTypes(input, offset, typeReference, function);
         }
-
         return decodeDynamicStructElements(input, offset, typeReference, function);
     }
 
@@ -744,7 +751,15 @@ public class TypeDecoder {
     @SuppressWarnings("unchecked")
     private static <T extends Type> int getDynamicStructDynamicParametersCount(
             final Class<?>[] cls) {
-        return (int) Arrays.stream(cls).filter(c -> isDynamic((Class<T>) c)).count();
+        int count = 0;
+        for (Class<?> c : cls) {
+            @SuppressWarnings("unchecked")
+            Class<T> ct = (Class<T>) c;
+            if (isDynamic(ct)) {
+                count++;
+            }
+        }
+        return count;
     }
 
     private static <T extends Type> T decodeDynamicParameterFromStruct(

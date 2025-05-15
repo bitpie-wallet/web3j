@@ -13,9 +13,9 @@
 package org.web3j.crypto;
 
 import java.math.BigInteger;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
-import java.util.stream.Collectors;
 
 import org.apache.tuweni.bytes.Bytes;
 
@@ -25,8 +25,6 @@ import org.web3j.rlp.RlpList;
 import org.web3j.rlp.RlpString;
 import org.web3j.rlp.RlpType;
 import org.web3j.utils.Numeric;
-
-import static java.util.stream.Collectors.toList;
 
 public class TransactionDecoder {
     private static final int UNSIGNED_EIP1559TX_RLP_LIST_SIZE = 9;
@@ -182,16 +180,20 @@ public class TransactionDecoder {
     }
 
     private static List<Blob> decodeBlobs(List<RlpType> rlpBlobs) {
-        return rlpBlobs.stream()
-                .map(r -> new Blob(((RlpString) r).getBytes()))
-                .collect(Collectors.toList());
+        List<Blob> list = new ArrayList<>();
+        for (RlpType r : rlpBlobs) {
+            list.add(new Blob(((RlpString) r).getBytes()));
+        }
+        return list;
     }
 
     //  Decoding logic for commitments and proofs
     private static List<Bytes> decodeBytesList(List<RlpType> rlpBytesList) {
-        return rlpBytesList.stream()
-                .map(r -> Bytes.wrap(((RlpString) r).getBytes()))
-                .collect(Collectors.toList());
+        List<Bytes> list = new ArrayList<>();
+        for (RlpType r : rlpBytesList) {
+            list.add(Bytes.wrap(((RlpString) r).getBytes()));
+        }
+        return list;
     }
 
     private static RawTransaction decodeEIP1559Transaction(final byte[] transaction) {
@@ -320,57 +322,53 @@ public class TransactionDecoder {
     }
 
     private static List<AccessListObject> decodeAccessList(List<RlpType> rlp) {
-        return rlp.stream()
-                .map(rawEntry -> ((RlpList) rawEntry).getValues())
-                .map(
-                        values -> {
-                            return new AccessListObject(
-                                    ((RlpString) values.get(0)).asString(),
-                                    ((RlpList) values.get(1))
-                                            .getValues().stream()
-                                                    .map(rawKey -> ((RlpString) rawKey).asString())
-                                                    .collect(toList()));
-                        })
-                .collect(toList());
+        List<AccessListObject> list = new ArrayList<>();
+        for (RlpType rawEntry : rlp) {
+            RlpList entry = (RlpList) rawEntry;
+            List<RlpType> values = entry.getValues();
+            String address = ((RlpString) values.get(0)).asString();
+
+            // decode the nested list of keys
+            RlpList keyList = (RlpList) values.get(1);
+            List<String> keys = new ArrayList<>();
+            for (RlpType rawKey : keyList.getValues()) {
+                keys.add(((RlpString) rawKey).asString());
+            }
+
+            list.add(new AccessListObject(address, keys));
+        }
+        return list;
     }
 
     public static List<Bytes> decodeVersionedHashes(List<RlpType> rlp) {
-        return rlp.stream()
-                .map(
-                        rlpType -> {
-                            if (rlpType instanceof RlpString) {
-                                RlpString rlpString = (RlpString) rlpType;
-                                return Bytes.wrap(rlpString.getBytes());
-                            } else {
-                                throw new IllegalArgumentException(
-                                        "List contains non-RlpString elements");
-                            }
-                        })
-                .collect(Collectors.toList());
+        List<Bytes> list = new ArrayList<>();
+        for (RlpType t : rlp) {
+            if (t instanceof RlpString) {
+                list.add(Bytes.wrap(((RlpString) t).getBytes()));
+            } else {
+                throw new IllegalArgumentException(
+                        "List contains non-RlpString elements");
+            }
+        }
+        return list;
     }
 
     private static List<AuthorizationTuple> decodeAuthorizationList(final List<RlpType> rlpList) {
-        return rlpList.stream()
-                .map(item -> (RlpList) item) // each authorization tuple is an RlpList
-                .map(
-                        tuple -> {
-                            final List<RlpType> elements = tuple.getValues();
-                            final BigInteger authChainId =
-                                    ((RlpString) elements.get(0)).asPositiveBigInteger();
-                            final String address = ((RlpString) elements.get(1)).asString();
-                            final BigInteger authNonce =
-                                    ((RlpString) elements.get(2)).asPositiveBigInteger();
-                            final BigInteger yParity =
-                                    ((RlpString) elements.get(3)).asPositiveBigInteger();
-                            final BigInteger rValue =
-                                    ((RlpString) elements.get(4)).asPositiveBigInteger();
-                            final BigInteger sValue =
-                                    ((RlpString) elements.get(5)).asPositiveBigInteger();
+        List<AuthorizationTuple> list = new ArrayList<>();
+        for (RlpType item : rlpList) {
+            RlpList tuple = (RlpList) item;
+            List<RlpType> elems = tuple.getValues();
 
-                            // Convert or store them as desired; for example:
-                            return new AuthorizationTuple(
-                                    authChainId, address, authNonce, yParity, rValue, sValue);
-                        })
-                .collect(Collectors.toList());
+            BigInteger authChainId = ((RlpString) elems.get(0)).asPositiveBigInteger();
+            String address          = ((RlpString) elems.get(1)).asString();
+            BigInteger authNonce    = ((RlpString) elems.get(2)).asPositiveBigInteger();
+            BigInteger yParity      = ((RlpString) elems.get(3)).asPositiveBigInteger();
+            BigInteger rValue       = ((RlpString) elems.get(4)).asPositiveBigInteger();
+            BigInteger sValue       = ((RlpString) elems.get(5)).asPositiveBigInteger();
+
+            list.add(new AuthorizationTuple(
+                    authChainId, address, authNonce, yParity, rValue, sValue));
+        }
+        return list;
     }
 }
